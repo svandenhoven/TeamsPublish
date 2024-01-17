@@ -61,12 +61,14 @@ else {
 // User to get access to App Catalog
 // Requirments:
 //      - User must be a Teams Service Administrator
-//      - User must have a Teams license
+//      - User must be a Teams Service Administrator for Publish
+//      - User must be Global Administrator for Update
 var credential = new identity_1.UsernamePasswordCredential(tenantId, clientId, userName, password);
 var authProvider = new azureTokenCredentials_1.TokenCredentialAuthenticationProvider(credential, {
     scopes: ['User.Read', 'AppCatalog.ReadWrite.All']
 });
-function getToken() {
+function getToken(print) {
+    if (print === void 0) { print = false; }
     return __awaiter(this, void 0, void 0, function () {
         var response;
         return __generator(this, function (_a) {
@@ -74,6 +76,8 @@ function getToken() {
                 case 0: return [4 /*yield*/, credential.getToken(['User.Read', 'AppCatalog.ReadWrite.All'])];
                 case 1:
                     response = _a.sent();
+                    if (print)
+                        console.log(response.token);
                     return [2 /*return*/, response.token];
             }
         });
@@ -101,7 +105,7 @@ function PostData(data, url) {
         var _this = this;
         return __generator(this, function (_a) {
             return [2 /*return*/, new Promise(function (resolve) { return __awaiter(_this, void 0, void 0, function () {
-                    var config, _a;
+                    var config, _a, response, error_1;
                     var _b, _c;
                     return __generator(this, function (_d) {
                         switch (_d.label) {
@@ -119,7 +123,56 @@ function PostData(data, url) {
                                     _c),
                                     _b.data = data,
                                     _b);
-                                (0, axios_1["default"])(config);
+                                _d.label = 2;
+                            case 2:
+                                _d.trys.push([2, 4, , 5]);
+                                return [4 /*yield*/, (0, axios_1["default"])(config)];
+                            case 3:
+                                response = _d.sent();
+                                console.log(response.data);
+                                resolve(response.data);
+                                return [3 /*break*/, 5];
+                            case 4:
+                                error_1 = _d.sent();
+                                console.log(error_1.response.data);
+                                return [3 /*break*/, 5];
+                            case 5: return [2 /*return*/];
+                        }
+                    });
+                }); })];
+        });
+    });
+}
+function patchData(url, etag) {
+    return __awaiter(this, void 0, void 0, function () {
+        var _this = this;
+        return __generator(this, function (_a) {
+            return [2 /*return*/, new Promise(function (resolve) { return __awaiter(_this, void 0, void 0, function () {
+                    var config, _a, response;
+                    var _b, _c;
+                    return __generator(this, function (_d) {
+                        switch (_d.label) {
+                            case 0:
+                                _b = {
+                                    method: 'patch',
+                                    url: url
+                                };
+                                _c = {};
+                                _a = 'Authorization';
+                                return [4 /*yield*/, getToken()];
+                            case 1:
+                                config = (_b.headers = (_c[_a] = _d.sent(),
+                                    _c['Content-Type'] = 'application/json',
+                                    _c['If-Match'] = etag,
+                                    _c),
+                                    _b.data = {
+                                        publishingState: 'published'
+                                    },
+                                    _b);
+                                return [4 /*yield*/, (0, axios_1["default"])(config)];
+                            case 2:
+                                response = _d.sent();
+                                console.log(response.data);
                                 return [2 /*return*/];
                         }
                     });
@@ -138,7 +191,7 @@ function publishApp() {
                         case 0:
                             if (err)
                                 throw err;
-                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=false')];
+                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=true')];
                         case 1:
                             _a.sent();
                             console.log('App published');
@@ -156,14 +209,25 @@ function updateApp(appId) {
         var _this = this;
         return __generator(this, function (_a) {
             teamsApp = fs.readFile('./package/appPackage.local.zip', function (err, data) { return __awaiter(_this, void 0, void 0, function () {
+                var response, error_2;
                 return __generator(this, function (_a) {
                     switch (_a.label) {
                         case 0:
                             if (err)
                                 throw err;
-                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + appId + '/appDefinitions')];
+                            _a.label = 1;
                         case 1:
-                            _a.sent();
+                            _a.trys.push([1, 3, , 4]);
+                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + appId + '/appDefinitions')];
+                        case 2:
+                            response = _a.sent();
+                            console.log(response);
+                            return [3 /*break*/, 4];
+                        case 3:
+                            error_2 = _a.sent();
+                            console.log(error_2);
+                            return [3 /*break*/, 4];
+                        case 4:
                             console.log('App updated');
                             return [2 /*return*/];
                     }
@@ -173,9 +237,41 @@ function updateApp(appId) {
         });
     });
 }
-if (command === 'update')
-    updateApp(appId);
-if (command === 'publish')
-    publishApp();
+function approveApp(appId) {
+    return __awaiter(this, void 0, void 0, function () {
+        var teamsApp, internalAppId, appDefinition, etag, appDefinitionId, newApDefinition;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0: return [4 /*yield*/, graphClient.api("/appCatalogs/teamsApps")
+                        .filter("externalId  eq '".concat(appId, "'"))
+                        .get()];
+                case 1:
+                    teamsApp = _a.sent();
+                    console.log(teamsApp);
+                    internalAppId = teamsApp.value[0].id;
+                    return [4 /*yield*/, graphClient.api("/appCatalogs/teamsApps/".concat(internalAppId, "/appDefinitions"))
+                            .get()];
+                case 2:
+                    appDefinition = _a.sent();
+                    console.log(appDefinition);
+                    etag = appDefinition.value[0]['@odata.etag'];
+                    appDefinitionId = appDefinition.value[0].id;
+                    return [4 /*yield*/, patchData("https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/".concat(internalAppId, "/appDefinitions/").concat(appDefinitionId), etag)];
+                case 3:
+                    newApDefinition = _a.sent();
+                    console.log(newApDefinition);
+                    return [2 /*return*/];
+            }
+        });
+    });
+}
 if (command === 'list')
     getApps();
+if (command === 'publish')
+    publishApp();
+if (command === 'approve')
+    approveApp(appId);
+if (command === 'update')
+    updateApp(appId);
+if (command === 'token')
+    console.log(getToken(true));
