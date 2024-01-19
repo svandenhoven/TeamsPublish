@@ -73,7 +73,7 @@ function getToken(print) {
         var response;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, credential.getToken(['User.Read', 'AppCatalog.ReadWrite.All'])];
+                case 0: return [4 /*yield*/, credential.getToken(['User.Read', 'AppCatalog.ReadWrite.All', 'AppCatalog.Submit'])];
                 case 1:
                     response = _a.sent();
                     if (print)
@@ -191,7 +191,7 @@ function publishApp() {
                         case 0:
                             if (err)
                                 throw err;
-                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=true')];
+                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=false')];
                         case 1:
                             _a.sent();
                             console.log('App published');
@@ -209,7 +209,53 @@ function updateApp(appId) {
         var _this = this;
         return __generator(this, function (_a) {
             teamsApp = fs.readFile('./package/appPackage.local.zip', function (err, data) { return __awaiter(_this, void 0, void 0, function () {
-                var response, error_2;
+                var teamsApp_1, internalAppId, response, error_2;
+                return __generator(this, function (_a) {
+                    switch (_a.label) {
+                        case 0:
+                            if (err)
+                                throw err;
+                            _a.label = 1;
+                        case 1:
+                            _a.trys.push([1, 4, , 5]);
+                            return [4 /*yield*/, graphClient.api("/appCatalogs/teamsApps")
+                                    .filter("externalId  eq '".concat(appId, "'"))
+                                    .get()];
+                        case 2:
+                            teamsApp_1 = _a.sent();
+                            console.log(teamsApp_1);
+                            if (teamsApp_1.value.length == 0) {
+                                console.log('App not found');
+                                return [2 /*return*/];
+                            }
+                            internalAppId = teamsApp_1.value[0].id;
+                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + internalAppId + '/appDefinitions')];
+                        case 3:
+                            response = _a.sent();
+                            console.log(response);
+                            return [3 /*break*/, 5];
+                        case 4:
+                            error_2 = _a.sent();
+                            console.log(error_2);
+                            return [3 /*break*/, 5];
+                        case 5:
+                            console.log('App updated');
+                            return [2 /*return*/];
+                    }
+                });
+            }); });
+            return [2 /*return*/];
+        });
+    });
+}
+function updateInternalApp(internalAppID) {
+    return __awaiter(this, void 0, void 0, function () {
+        var teamsApp;
+        var _this = this;
+        return __generator(this, function (_a) {
+            console.log("Updating app ".concat(internalAppID));
+            teamsApp = fs.readFile('./package/appPackage.local.zip', function (err, data) { return __awaiter(_this, void 0, void 0, function () {
+                var response, error_3;
                 return __generator(this, function (_a) {
                     switch (_a.label) {
                         case 0:
@@ -218,14 +264,14 @@ function updateApp(appId) {
                             _a.label = 1;
                         case 1:
                             _a.trys.push([1, 3, , 4]);
-                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + appId + '/appDefinitions')];
+                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + internalAppID + '/appDefinitions')];
                         case 2:
                             response = _a.sent();
                             console.log(response);
                             return [3 /*break*/, 4];
                         case 3:
-                            error_2 = _a.sent();
-                            console.log(error_2);
+                            error_3 = _a.sent();
+                            console.log(error_3);
                             return [3 /*break*/, 4];
                         case 4:
                             console.log('App updated');
@@ -248,6 +294,10 @@ function approveApp(appId) {
                 case 1:
                     teamsApp = _a.sent();
                     console.log(teamsApp);
+                    if (teamsApp.value.length == 0) {
+                        console.log('App not found');
+                        return [2 /*return*/];
+                    }
                     internalAppId = teamsApp.value[0].id;
                     return [4 /*yield*/, graphClient.api("/appCatalogs/teamsApps/".concat(internalAppId, "/appDefinitions"))
                             .get()];
@@ -273,5 +323,7 @@ if (command === 'approve')
     approveApp(appId);
 if (command === 'update')
     updateApp(appId);
+if (command === 'updateInternal')
+    updateInternalApp(appId);
 if (command === 'token')
     console.log(getToken(true));
