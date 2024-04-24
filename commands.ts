@@ -29,6 +29,7 @@ if (args.length < 6) {
 //      - User must be a Teams Service Administrator
 //      - User must be a Teams Service Administrator for Publish
 //      - User must be Global Administrator for Update
+//      - The clientID need to have "Allow public client flows enabled" in the app registration
 const credential = new UsernamePasswordCredential(
   tenantId,
   clientId,
@@ -49,12 +50,45 @@ async function getToken(print: boolean = false) : Promise<string> {
 
 const graphClient = Client.initWithMiddleware({ authProvider: authProvider });
 
-async function getApps() {
-    let teamsApps = await graphClient.api('/appCatalogs/teamsApps')
-    .filter('distributionMethod eq \'organization\'')
-	.get();
-    console.log(teamsApps);
+async function getAppId() {
+    // let teamsApps = await graphClient.api('/appCatalogs/teamsApps')
+    // .filter('distributionMethod eq \'organization\'')
+	// .get();
+    // console.log(teamsApps);
+    const url = `https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?$filter=externalId eq \'${appId}\'`;
+    console.log(url);
+    await getData(url);
   }
+
+async function getApps() {
+    // let teamsApps = await graphClient.api('/appCatalogs/teamsApps')
+    // .filter('distributionMethod eq \'organization\'')
+	// .get();
+    // console.log(teamsApps);
+    await getData('https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?$filter=distributionMethod eq \'organization\'');
+  }
+
+  async function getData(url) {
+    return new Promise(async (resolve) => {
+        var config = {
+            method: 'get',
+            url: url,
+            headers: {
+                'Authorization': await getToken(),
+                'Content-Type': 'application/zip'
+            }
+        };
+
+        try {
+            const response = await axios(config);
+            console.log(response);
+            console.log(JSON.stringify(response.data));
+            //resolve(response.data);
+        } catch (error) {
+            console.log(error.response.data);
+        }
+    })  
+}
 
 async function PostData(data, url) {
     return new Promise(async (resolve) => {
@@ -70,62 +104,61 @@ async function PostData(data, url) {
 
         try {
             const response = await axios(config);
-            resolve(response.data);
+            console.log(response);
+            //resolve(response.data);
         } catch (error) {
             console.log(error.response.data);
         }
     })  
 }
 
-async function patchData(url, etag) {
-    return new Promise(async (resolve) => {
-        var config = {
-            method: 'patch',
-            url: url,
-            headers: {
-                'Authorization': await getToken(),
-                'Content-Type': 'application/json',
-                'If-Match': etag
-            },
-            data: {
-                publishingState: 'published'
-            }
-        };
-
-        const response = await axios(config);
-        console.log(response.data);
-    })
-}
-
 async function publishApp() {
     const teamsApp = fs.readFile('./package/appPackage.local.zip', async (err, data) => {
         if (err) throw err;
-        await PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=false');
+        await PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=true');
         console.log('App published');
     });
 }
 
 async function updateApp(appId: string) {
     const teamsApp = fs.readFile('./package/appPackage.local.zip', async (err, data) => {
+        let stop = false;
+        const startTimestamp = Date.now();
+        let endTimestamp = Date.now();
         if (err) throw err;
         try { 
-            const teamsApp = await graphClient.api(`/appCatalogs/teamsApps`)
-            .filter(`externalId  eq '${appId}'`)
-            .get();
-            console.log(teamsApp);
-            if(teamsApp.value.length == 0) {
-                console.log('App not found');
-                return;
+            while(!stop) {
+                const teamsApp = await graphClient.api(`/appCatalogs/teamsApps`)
+                .filter(`externalId  eq '${appId}'`)
+                .get();
+                console.log(teamsApp);
+                if(teamsApp.value.length == 0) {
+                    console.log(`${Date.now()} : App not found`);
+                    // Sleep for 1 minute
+                    showTimepassed(Date.now(), startTimestamp);
+                    await new Promise(resolve => setTimeout(resolve, 60000));                    
+                }
+                else {
+                    const internalAppId = teamsApp.value[0].id;
+                    const response = await PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + internalAppId + '/appDefinitions');
+                    console.log(response);
+                    stop = true;
+                    let endTimestamp = Date.now();
+                }
             }
-            
-            const internalAppId = teamsApp.value[0].id;
-            const response = await PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + internalAppId + '/appDefinitions');
-            console.log(response);
+            showTimepassed(endTimestamp, startTimestamp);
         } catch (error) {
             console.log(error);
         }
         console.log('App updated');
     });
+}
+
+function showTimepassed(endTimestamp: number, startTimestamp: number) {
+    const timePassed = endTimestamp - startTimestamp;
+    const hoursPassed = Math.floor(timePassed / 3600000); // 1 Hour = 36000 Milliseconds
+    const minutesPassed = Math.floor((timePassed % 3600000) / 60000); // 1 Minute = 60000 Milliseconds
+    console.log(`Time passed: ${hoursPassed} Hours, ${minutesPassed} Minutes`);
 }
 
 async function updateInternalApp(internalAppID: string) {
@@ -164,6 +197,27 @@ async function approveApp(appId: string) {
     console.log(newApDefinition);
 }
 
+async function patchData(url, etag) {
+    return new Promise(async (resolve) => {
+        var config = {
+            method: 'patch',
+            url: url,
+            headers: {
+                'Authorization': await getToken(),
+                'Content-Type': 'application/json',
+                'If-Match': etag
+            },
+            data: {
+                publishingState: 'published'
+            }
+        };
+
+        const response = await axios(config);
+        console.log(response);
+    })
+}
+
+if(command === 'listApp') getAppId();
 if(command === 'list') getApps();
 if(command === 'publish') publishApp();
 if(command === 'approve') approveApp(appId);

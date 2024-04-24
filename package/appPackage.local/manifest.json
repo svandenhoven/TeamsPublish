@@ -1,0 +1,46 @@
+{
+    "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+    "manifestVersion": "1.16",
+    "version": "1.0.0",
+    "id": "5bdde98f-134e-4121-97da-aa1691edee3c",
+    "packageName": "com.microsoft.teams.extension",
+    "developer": {
+        "name": "Publish App, Inc.",
+        "websiteUrl": "https://www.example.com",
+        "privacyUrl": "https://www.example.com/privacy",
+        "termsOfUseUrl": "https://www.example.com/termsofuse"
+    },
+    "icons": {
+        "color": "color.png",
+        "outline": "outline.png"
+    },
+    "name": {
+        "short": "PublishTestApplocal",
+        "full": "Full name for PublishTestApp"
+    },
+    "description": {
+        "short": "Short description of PublishTestApp v1.0.0",
+        "full": "Full description of PublishTestApp"
+    },
+    "accentColor": "#FFFFFF",
+    "bots": [],
+    "composeExtensions": [],
+    "staticTabs": [
+        {
+            "entityId": "index0",
+            "name": "Personal Tab",
+            "contentUrl": "https://localhost:53000/tab",
+            "websiteUrl": "https://localhost:53000/tab",
+            "scopes": [
+                "personal"
+            ]
+        }
+    ],
+    "permissions": [
+        "identity",
+        "messageTeamMembers"
+    ],
+    "validDomains": [
+        "localhost:53000"
+    ]
+}

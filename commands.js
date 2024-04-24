@@ -63,6 +63,7 @@ else {
 //      - User must be a Teams Service Administrator
 //      - User must be a Teams Service Administrator for Publish
 //      - User must be Global Administrator for Update
+//      - The clientID need to have "Allow public client flows enabled" in the app registration
 var credential = new identity_1.UsernamePasswordCredential(tenantId, clientId, userName, password);
 var authProvider = new azureTokenCredentials_1.TokenCredentialAuthenticationProvider(credential, {
     scopes: ['User.Read', 'AppCatalog.ReadWrite.All']
@@ -84,19 +85,82 @@ function getToken(print) {
     });
 }
 var graphClient = microsoft_graph_client_1.Client.initWithMiddleware({ authProvider: authProvider });
-function getApps() {
+function getAppId() {
     return __awaiter(this, void 0, void 0, function () {
-        var teamsApps;
+        var url;
         return __generator(this, function (_a) {
             switch (_a.label) {
-                case 0: return [4 /*yield*/, graphClient.api('/appCatalogs/teamsApps')
-                        .filter('distributionMethod eq \'organization\'')
-                        .get()];
+                case 0:
+                    url = "https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?$filter=externalId eq '".concat(appId, "'");
+                    console.log(url);
+                    return [4 /*yield*/, getData(url)];
                 case 1:
-                    teamsApps = _a.sent();
-                    console.log(teamsApps);
+                    _a.sent();
                     return [2 /*return*/];
             }
+        });
+    });
+}
+function getApps() {
+    return __awaiter(this, void 0, void 0, function () {
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0: 
+                // let teamsApps = await graphClient.api('/appCatalogs/teamsApps')
+                // .filter('distributionMethod eq \'organization\'')
+                // .get();
+                // console.log(teamsApps);
+                return [4 /*yield*/, getData('https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?$filter=distributionMethod eq \'organization\'')];
+                case 1:
+                    // let teamsApps = await graphClient.api('/appCatalogs/teamsApps')
+                    // .filter('distributionMethod eq \'organization\'')
+                    // .get();
+                    // console.log(teamsApps);
+                    _a.sent();
+                    return [2 /*return*/];
+            }
+        });
+    });
+}
+function getData(url) {
+    return __awaiter(this, void 0, void 0, function () {
+        var _this = this;
+        return __generator(this, function (_a) {
+            return [2 /*return*/, new Promise(function (resolve) { return __awaiter(_this, void 0, void 0, function () {
+                    var config, _a, response, error_1;
+                    var _b, _c;
+                    return __generator(this, function (_d) {
+                        switch (_d.label) {
+                            case 0:
+                                _b = {
+                                    method: 'get',
+                                    url: url
+                                };
+                                _c = {};
+                                _a = 'Authorization';
+                                return [4 /*yield*/, getToken()];
+                            case 1:
+                                config = (_b.headers = (_c[_a] = _d.sent(),
+                                    _c['Content-Type'] = 'application/zip',
+                                    _c),
+                                    _b);
+                                _d.label = 2;
+                            case 2:
+                                _d.trys.push([2, 4, , 5]);
+                                return [4 /*yield*/, (0, axios_1["default"])(config)];
+                            case 3:
+                                response = _d.sent();
+                                console.log(response);
+                                console.log(JSON.stringify(response.data));
+                                return [3 /*break*/, 5];
+                            case 4:
+                                error_1 = _d.sent();
+                                console.log(error_1.response.data);
+                                return [3 /*break*/, 5];
+                            case 5: return [2 /*return*/];
+                        }
+                    });
+                }); })];
         });
     });
 }
@@ -105,7 +169,7 @@ function PostData(data, url) {
         var _this = this;
         return __generator(this, function (_a) {
             return [2 /*return*/, new Promise(function (resolve) { return __awaiter(_this, void 0, void 0, function () {
-                    var config, _a, response, error_1;
+                    var config, _a, response, error_2;
                     var _b, _c;
                     return __generator(this, function (_d) {
                         switch (_d.label) {
@@ -129,12 +193,11 @@ function PostData(data, url) {
                                 return [4 /*yield*/, (0, axios_1["default"])(config)];
                             case 3:
                                 response = _d.sent();
-                                console.log(response.data);
-                                resolve(response.data);
+                                console.log(response);
                                 return [3 /*break*/, 5];
                             case 4:
-                                error_1 = _d.sent();
-                                console.log(error_1.response.data);
+                                error_2 = _d.sent();
+                                console.log(error_2.response.data);
                                 return [3 /*break*/, 5];
                             case 5: return [2 /*return*/];
                         }
@@ -172,7 +235,7 @@ function patchData(url, etag) {
                                 return [4 /*yield*/, (0, axios_1["default"])(config)];
                             case 2:
                                 response = _d.sent();
-                                console.log(response.data);
+                                console.log(response);
                                 return [2 /*return*/];
                         }
                     });
@@ -191,7 +254,7 @@ function publishApp() {
                         case 0:
                             if (err)
                                 throw err;
-                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=false')];
+                            return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps?requiresReview=true')];
                         case 1:
                             _a.sent();
                             console.log('App published');
@@ -209,36 +272,53 @@ function updateApp(appId) {
         var _this = this;
         return __generator(this, function (_a) {
             teamsApp = fs.readFile('./package/appPackage.local.zip', function (err, data) { return __awaiter(_this, void 0, void 0, function () {
-                var teamsApp_1, internalAppId, response, error_2;
+                var stop, startTimestamp, endTimestamp, teamsApp_1, internalAppId, response, endTimestamp_1, error_3;
                 return __generator(this, function (_a) {
                     switch (_a.label) {
                         case 0:
+                            stop = false;
+                            startTimestamp = Date.now();
+                            endTimestamp = Date.now();
                             if (err)
                                 throw err;
                             _a.label = 1;
                         case 1:
-                            _a.trys.push([1, 4, , 5]);
+                            _a.trys.push([1, 9, , 10]);
+                            _a.label = 2;
+                        case 2:
+                            if (!!stop) return [3 /*break*/, 8];
                             return [4 /*yield*/, graphClient.api("/appCatalogs/teamsApps")
                                     .filter("externalId  eq '".concat(appId, "'"))
                                     .get()];
-                        case 2:
+                        case 3:
                             teamsApp_1 = _a.sent();
                             console.log(teamsApp_1);
-                            if (teamsApp_1.value.length == 0) {
-                                console.log('App not found');
-                                return [2 /*return*/];
-                            }
+                            if (!(teamsApp_1.value.length == 0)) return [3 /*break*/, 5];
+                            console.log("".concat(Date.now(), " : App not found"));
+                            // Sleep for 1 minute
+                            showTimepassed(Date.now(), startTimestamp);
+                            return [4 /*yield*/, new Promise(function (resolve) { return setTimeout(resolve, 60000); })];
+                        case 4:
+                            _a.sent();
+                            return [3 /*break*/, 7];
+                        case 5:
                             internalAppId = teamsApp_1.value[0].id;
                             return [4 /*yield*/, PostData(data, 'https://graph.microsoft.com/v1.0/appCatalogs/teamsApps/' + internalAppId + '/appDefinitions')];
-                        case 3:
+                        case 6:
                             response = _a.sent();
                             console.log(response);
-                            return [3 /*break*/, 5];
-                        case 4:
-                            error_2 = _a.sent();
-                            console.log(error_2);
-                            return [3 /*break*/, 5];
-                        case 5:
+                            stop = true;
+                            endTimestamp_1 = Date.now();
+                            _a.label = 7;
+                        case 7: return [3 /*break*/, 2];
+                        case 8:
+                            showTimepassed(endTimestamp, startTimestamp);
+                            return [3 /*break*/, 10];
+                        case 9:
+                            error_3 = _a.sent();
+                            console.log(error_3);
+                            return [3 /*break*/, 10];
+                        case 10:
                             console.log('App updated');
                             return [2 /*return*/];
                     }
@@ -248,6 +328,12 @@ function updateApp(appId) {
         });
     });
 }
+function showTimepassed(endTimestamp, startTimestamp) {
+    var timePassed = endTimestamp - startTimestamp;
+    var hoursPassed = Math.floor(timePassed / 3600000); // 1 Hour = 36000 Milliseconds
+    var minutesPassed = Math.floor((timePassed % 3600000) / 60000); // 1 Minute = 60000 Milliseconds
+    console.log("Time passed: ".concat(hoursPassed, " Hours, ").concat(minutesPassed, " Minutes"));
+}
 function updateInternalApp(internalAppID) {
     return __awaiter(this, void 0, void 0, function () {
         var teamsApp;
@@ -255,7 +341,7 @@ function updateInternalApp(internalAppID) {
         return __generator(this, function (_a) {
             console.log("Updating app ".concat(internalAppID));
             teamsApp = fs.readFile('./package/appPackage.local.zip', function (err, data) { return __awaiter(_this, void 0, void 0, function () {
-                var response, error_3;
+                var response, error_4;
                 return __generator(this, function (_a) {
                     switch (_a.label) {
                         case 0:
@@ -270,8 +356,8 @@ function updateInternalApp(internalAppID) {
                             console.log(response);
                             return [3 /*break*/, 4];
                         case 3:
-                            error_3 = _a.sent();
-                            console.log(error_3);
+                            error_4 = _a.sent();
+                            console.log(error_4);
                             return [3 /*break*/, 4];
                         case 4:
                             console.log('App updated');
@@ -315,6 +401,8 @@ function approveApp(appId) {
         });
     });
 }
+if (command === 'listApp')
+    getAppId();
 if (command === 'list')
     getApps();
 if (command === 'publish')
